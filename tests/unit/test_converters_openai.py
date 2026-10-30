@@ -1839,6 +1839,66 @@ class TestExtractThinkingConfigFromOpenAI:
 
 class TestBuildKiroPayloadIntegration:
     """Integration tests for build_kiro_payload with thinking config."""
+
+    def test_resolves_auto_alias_before_sending_to_kiro(self):
+        """The public auto-kiro name must become Kiro's auto model ID."""
+        request = ChatCompletionRequest(
+            model="auto-kiro",
+            messages=[ChatMessage(role="user", content="Test message")],
+        )
+
+        payload = build_kiro_payload(request, "test-conv-123", "arn:aws:test")
+        model_id = payload["conversationState"]["currentMessage"]["userInputMessage"]["modelId"]
+
+        assert model_id == "auto"
+
+    def test_opus_55_does_not_receive_fake_reasoning_tags(self, monkeypatch):
+        """Native adaptive thinking must not receive the legacy prompt protocol."""
+        monkeypatch.setattr("kiro.converters_core.FAKE_REASONING_ENABLED", True)
+
+        request = ChatCompletionRequest(
+            model="claude-opus-5.5",
+            messages=[ChatMessage(role="user", content="What is 2 plus 2?")],
+            max_tokens=256,
+        )
+
+        payload = build_kiro_payload(request, "test-conv-123", "arn:aws:test")
+        content = payload["conversationState"]["currentMessage"]["userInputMessage"]["content"]
+
+        assert "<thinking_mode>" not in content
+        assert content.endswith("What is 2 plus 2?")
+
+    def test_opus_5_does_not_receive_fake_reasoning_tags(self, monkeypatch):
+        """Opus 5 must use the same native-thinking compatibility path."""
+        monkeypatch.setattr("kiro.converters_core.FAKE_REASONING_ENABLED", True)
+
+        request = ChatCompletionRequest(
+            model="claude-opus-5",
+            messages=[ChatMessage(role="user", content="What is 2 plus 2?")],
+            max_tokens=256,
+        )
+
+        payload = build_kiro_payload(request, "test-conv-123", "arn:aws:test")
+        content = payload["conversationState"]["currentMessage"]["userInputMessage"]["content"]
+
+        assert "<thinking_mode>" not in content
+        assert content.endswith("What is 2 plus 2?")
+
+    def test_sonnet_55_does_not_receive_fake_reasoning_tags(self, monkeypatch):
+        """Sonnet 5.5 must use Kiro's native adaptive-thinking path."""
+        monkeypatch.setattr("kiro.converters_core.FAKE_REASONING_ENABLED", True)
+
+        request = ChatCompletionRequest(
+            model="claude-sonnet-5.5",
+            messages=[ChatMessage(role="user", content="What is 2 plus 2?")],
+            max_tokens=256,
+        )
+
+        payload = build_kiro_payload(request, "test-conv-123", "arn:aws:test")
+        content = payload["conversationState"]["currentMessage"]["userInputMessage"]["content"]
+
+        assert "<thinking_mode>" not in content
+        assert content.endswith("What is 2 plus 2?")
     
     def test_extracts_and_passes_thinking_config(self, monkeypatch):
         """

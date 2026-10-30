@@ -629,6 +629,16 @@ class TestGetModelIdForKiro:
         print(f"Comparing result: Expected 'claude-unknown-model' (pass-through), Got '{result}'")
         assert result == "claude-unknown-model"
 
+    def test_resolves_alias_to_runtime_model_id(self):
+        """Configured aliases must resolve before the request reaches Kiro."""
+        result = get_model_id_for_kiro(
+            "auto-kiro",
+            {},
+            {"auto-kiro": "auto"},
+        )
+
+        assert result == "auto"
+
 
 # =============================================================================
 # TestModelResolver - Tests for ModelResolver class

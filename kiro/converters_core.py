@@ -46,6 +46,13 @@ from kiro.config import (
 )
 from kiro.payload_guards import check_payload_size, trim_payload_to_limit
 
+NATIVE_ADAPTIVE_THINKING_MODELS = frozenset({
+    "claude-opus-5",
+    "claude-opus-5.5",
+    "claude-sonnet-5.5",
+    "claude-fable-5.1",
+})
+
 
 # ==================================================================================================
 # Data Classes for Unified Message Format
@@ -1443,8 +1450,12 @@ def build_kiro_payload(
     if tool_documentation:
         full_system_prompt = full_system_prompt + tool_documentation if full_system_prompt else tool_documentation.strip()
     
-    # Add thinking mode legitimization to system prompt if enabled
-    thinking_system_addition = get_thinking_system_prompt_addition()
+    uses_native_adaptive_thinking = model_id in NATIVE_ADAPTIVE_THINKING_MODELS
+
+    # Native adaptive-thinking models reject the gateway's fake reasoning protocol.
+    thinking_system_addition = (
+        "" if uses_native_adaptive_thinking else get_thinking_system_prompt_addition()
+    )
     if thinking_system_addition:
         full_system_prompt = full_system_prompt + thinking_system_addition if full_system_prompt else thinking_system_addition.strip()
     
@@ -1547,7 +1558,7 @@ def build_kiro_payload(
             user_input_context["toolResults"] = tool_results
     
     # Inject thinking tags if enabled (only for the current/last user message)
-    if current_message.role == "user":
+    if current_message.role == "user" and not uses_native_adaptive_thinking:
         current_content = inject_thinking_tags(current_content, thinking_config)
     
     # Build userInputMessage
